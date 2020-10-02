@@ -22,7 +22,9 @@ package matrix.client.regular;
 
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
-
+import java8.util.Optional;
+import java8.util.stream.Collectors;
+import java8.util.stream.StreamSupport;
 import matrix.MatrixID;
 import matrix._MatrixContent;
 import matrix._MatrixID;
@@ -34,7 +36,7 @@ import matrix.room.RoomAlias;
 import matrix.room.RoomAliasLookup;
 import matrix.room._RoomAliasLookup;
 import matrix.room._RoomCreationOptions;
-
+import okhttp3.*;
 import org.apache.commons.codec.digest.HmacAlgorithms;
 import org.apache.commons.codec.digest.HmacUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -46,12 +48,6 @@ import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
 import java.util.List;
-import java8.util.Optional;
-import java8.util.stream.Collectors;
-import java8.util.stream.StreamSupport;
-
-
-import okhttp3.*;
 
 public class MatrixHttpClient extends AMatrixHttpClient implements _MatrixClient {
 
@@ -168,8 +164,22 @@ public class MatrixHttpClient extends AMatrixHttpClient implements _MatrixClient
         body.addProperty("password", credentials.getPassword());
         body.addProperty("mac", mac);
         body.addProperty("type", "org.matrix.login.shared_secret");
-        body.addProperty("admin", false);
+        body.addProperty("admin", admin);
         URL url = getPath("client", "api", "v1", "register");
+        updateContext(execute(new Request.Builder().post(getJsonBody(body)).url(url)));
+    }
+
+    @Override
+    public void register(MatrixPasswordCredentials credentials, boolean admin) {
+        JsonObject body = new JsonObject();
+        JsonObject authType = new JsonObject();
+        authType.addProperty("type", "m.login.dummy");
+
+        body.addProperty("username", credentials.getLocalPart());
+        body.addProperty("password", credentials.getPassword());
+
+        body.add("auth", authType);
+        URL url = getPath("client", "r0", "register");
         updateContext(execute(new Request.Builder().post(getJsonBody(body)).url(url)));
     }
 

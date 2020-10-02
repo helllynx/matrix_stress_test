@@ -1,4 +1,3 @@
-
 /**
  * Logs type enum
  *
@@ -7,6 +6,8 @@
  */
 enum class LogType(val logFileName: String) {
     MESSAGE("message.log"),
+    REGISTER("register.log"),
     LOGIN("login.log"),
-    JOIN("join.log")
+    JOIN("join.log"),
+    TOTAL("total.log")
 }

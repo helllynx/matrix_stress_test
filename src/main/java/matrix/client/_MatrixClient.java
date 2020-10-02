@@ -21,7 +21,7 @@
 package matrix.client;
 
 import com.google.gson.JsonObject;
-
+import java8.util.Optional;
 import matrix._MatrixContent;
 import matrix._MatrixID;
 import matrix._MatrixUser;
@@ -33,7 +33,6 @@ import matrix.room._RoomCreationOptions;
 import java.io.File;
 import java.net.URI;
 import java.util.List;
-import java8.util.Optional;
 
 public interface _MatrixClient extends _MatrixClientRaw {
 
@@ -59,9 +58,13 @@ public interface _MatrixClient extends _MatrixClientRaw {
     // TODO refactor into custom synapse class?
     void register(MatrixPasswordCredentials credentials, String sharedSecret, boolean admin);
 
+    /* Custom endpoint! */
+    // TODO refactor into custom synapse class?
+    void register(MatrixPasswordCredentials credentials, boolean admin);
+
     /***
      * Set the access token to use for any authenticated API calls.
-     * 
+     *
      * @param accessToken
      *            The access token provided by the server which must be valid
      * @throws MatrixClientRequestException

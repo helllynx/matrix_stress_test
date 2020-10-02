@@ -23,12 +23,13 @@ package matrix.client;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
-
+import java8.util.Objects;
+import java8.util.Optional;
 import matrix.MatrixErrorInfo;
 import matrix._MatrixID;
 import matrix.hs._MatrixHomeserver;
 import matrix.json.GsonUtil;
-
+import okhttp3.*;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -38,11 +39,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import java8.util.Objects;
-import java8.util.Optional;
-
-
-import okhttp3.*;
 
 public abstract class AMatrixHttpClient implements _MatrixClientRaw {
 

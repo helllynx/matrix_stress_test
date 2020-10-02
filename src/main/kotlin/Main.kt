@@ -15,13 +15,16 @@ fun main() {
     val password = ""
 
     // read room id-s from file
-    val roomAddresses = File("rooms.txt").readLines()
+    val roomAddresses = File(Files.ROOMS.path).readLines()
 
     // how mach users join and flood in room
     val usersPerRoom = 50
 
     // just temporary variable
     var currentUserId = 0
+
+    // count of messages peer user
+    val countOfMessages = 10
 
     val testData = mutableListOf<RoomUserBatch>()
 
@@ -31,47 +34,73 @@ fun main() {
         currentUserId += usersPerRoom + 1
     }
 
-    // this method creates many user connections to matrix and start to sending messages
-    runBlocking {
-        processSendMessagesAsync(host, testData, password)
-    }
+    // run it once for creating rooms
+//    runBlocking {
+//        processCreatePublicRoomAsync(host, 0 to 10, "admin", "admin")
+//    }
 
-    // run it once when was chat created and this is jpon users to rooms which in
+//    runBlocking {
+//        processRegisterUsersAsync(host, 0 to 1000, password)
+//    }
+
+    // run it once when was chat created and this is join users to rooms which in
 //    runBlocking {
 //        processJoinToRoomAsync(host, testData, password)
 //    }
 
-    // run it once to create rooms
-//    for (i in 10..20) {
-//        println(createPublicRoom(host, "admin", password, "test$i"))
-//    }
+    // this method creates many user connections to matrix and start to sending messages
+    runBlocking {
+        processSendMessagesAsync(host, testData, password, countOfMessages)
+    }
 }
 
-// run coroutine with sendMessages for each element of testData, then sendMessages inside run coroutine for each user
-suspend fun processSendMessagesAsync(host: URL, testData: List<RoomUserBatch>, password: String) {
-    try {
-        val deferred = testData.map { data ->
-            GlobalScope.async {
-                sendMessages(host, data.roomId, password, data.fromTo)
-            }
-        }
-        deferred.joinAll()
 
+// run coroutine with sendMessages for each element of testData, then sendMessages inside run coroutine for each user
+suspend fun processSendMessagesAsync(host: URL, testData: List<RoomUserBatch>, password: String, countOfMessages: Int) {
+    try {
+        val start = System.nanoTime()
+        testData.map { data ->
+            GlobalScope.async {
+                sendMessages(host, data.roomId, password, data.fromTo, countOfMessages = countOfMessages)
+            }
+        }.joinAll()
+        writeLog(LogType.TOTAL, "messages ${countOfMessages}: ${(System.nanoTime() - start)}")
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
     }
 }
 
+
 // run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
 suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomUserBatch>, password: String) {
     try {
-        val deferred = testData.map { data ->
-            GlobalScope.async {
-                joinToRoom(host, data.fromTo, password, data.roomId)
-            }
-        }
-        deferred.joinAll()
+        val start = System.nanoTime()
+        testData.map { data -> GlobalScope.async { joinToRoom(host, data.fromTo, password, data.roomId) } }.joinAll()
+        writeLog(LogType.TOTAL, "join: ${(System.nanoTime() - start)}")
+    } catch (e: MatrixClientRequestException) {
+        e.printStackTrace()
+    }
+}
 
+
+// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+suspend fun processRegisterUsersAsync(host: URL, fromTo: Pair<Int, Int>, password: String) {
+    try {
+        val start = System.nanoTime()
+        GlobalScope.async { registerUsers(host, fromTo, password) }.join()
+        writeLog(LogType.TOTAL, "register ${fromTo.first} - ${fromTo.second}: ${(System.nanoTime() - start)}")
+    } catch (e: MatrixClientRequestException) {
+        e.printStackTrace()
+    }
+}
+
+
+// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+suspend fun processCreatePublicRoomAsync(host: URL, fromTo: Pair<Int, Int>, userName: String, password: String) {
+    try {
+        val start = System.nanoTime()
+        GlobalScope.async { createPublicRoom(host, fromTo, userName, password) }.join()
+        writeLog(LogType.TOTAL, "create room ${fromTo.first} - ${fromTo.second}: ${(System.nanoTime() - start)}")
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
     }
