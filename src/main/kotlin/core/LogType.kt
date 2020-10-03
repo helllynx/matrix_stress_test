@@ -1,3 +1,5 @@
+package core
+
 /**
  * Logs type enum
  *

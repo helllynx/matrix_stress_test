@@ -1,3 +1,5 @@
+package core
+
 import kotlinx.coroutines.*
 import matrix.MatrixID
 import matrix.client.MatrixClientRequestException
@@ -186,6 +188,7 @@ suspend fun sendMessagesToPrivateConversation(
     }
 }
 
+
 private suspend fun sendMessagesToDirectRoom(
         host: URL,
         roomId: String,
@@ -248,7 +251,17 @@ suspend fun registerUsers(
     }
 }
 
-
+/**
+ * Async invite user to room
+ *
+ *
+ * @param  host  url of homeserver
+ * @param  domain home server domain, like matrix.example.com
+ * @param  bob id of first user
+ * @param  alice id of second user
+ * @param  password  password of new user
+ * @param  roomId  room id like !KaVmYkkfnthPVfFpfi:matrix.example.com
+ */
 suspend fun inviteUserToDirectRoom(
         host: URL,
         domain: String,
@@ -280,10 +293,32 @@ fun saveRoomIdToFile(roomId: String) {
     File(Files.PUBLIC_ROOMS.path).appendText(roomId + "\n")
 }
 
+/**
+ * Save room id and users start and id to file
+ *
+ * Save strings like - 0 49 !lIEXvrnoNmSOsYLhXJ:matrix.example.com
+ * where 0 is start user id and 49 is last and !lIEXvrnoNmSOsYLhXJ:matrix.example.com is room id
+ * this means that in room !lIEXvrnoNmSOsYLhXJ:matrix.example.com we join user_0 to user_49
+ *
+ * @param  start  start user id
+ * @param  end  end user id
+ * @param  roomId  room id like !KaVmYkkfnthPVfFpfi:matrix.example.com
+ */
 fun savePublicRoomAndUserStartEndToFile(start: Int, end: Int, roomId: String) {
     File(Files.PUBLIC_ROOMS_AND_USER_RANGE.path).appendText("$start $end $roomId\n")
 }
 
+/**
+ * Save room id and users bob and alice id to file
+ *
+ * Save strings like - 0 1 !lIEXvrnoNmSOsYLhXJ:matrix.example.com
+ * where 0 is user id of bob and 1 is user id of alice and !lIEXvrnoNmSOsYLhXJ:matrix.example.com is room id
+ * this means that in room !lIEXvrnoNmSOsYLhXJ:matrix.example.com we join user_0 to user_1
+ *
+ * @param  bob  bob user id
+ * @param  alice  alice user id
+ * @param  roomId  room id like !KaVmYkkfnthPVfFpfi:matrix.example.com
+ */
 fun saveDirectRoomAndUsersToFile(bob: Int, alice: Int, roomId: String) {
     File(Files.DIRECT_ROOMS_AND_USER_IDS.path).appendText("$bob $alice $roomId\n")
 }

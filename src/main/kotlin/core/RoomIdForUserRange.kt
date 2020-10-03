@@ -1,3 +1,5 @@
+package core
+
 /**
  * Data class for test data which contains room and id-s of users.
  *

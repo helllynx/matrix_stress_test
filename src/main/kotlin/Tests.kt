@@ -1,3 +1,4 @@
+import core.*
 import kotlinx.coroutines.*
 import matrix.client.MatrixClientRequestException
 import java.io.File
@@ -8,74 +9,86 @@ import kotlin.system.measureNanoTime
 
 
 fun main() {
-    Main().process()
+    File(Tests.currentLogDirPath).mkdirs()
+    // run this once for creating users
+//    Main().registerTestUsers()
+
+    // run this once to create rooms and join users to them
+//    Tests().prepareForPublicMassRoomsTest(50, 0..10, "user_0", Tests.password)
+
+//    Tests().publicMassRoomsTest()
+
+    // run this once to create rooms and join users to them
+//    Tests().prepareForDirectRoomsTest(0..1000)
+
+    Tests().directRoomsTest(1000)
 }
 
-class Main {
-    fun process() {
-        File(currentLogDirPath).mkdirs()
+class Tests {
 
-        // region common parameters
+    fun registerTestUsers(usersRange: IntRange) {
 
-        // here replace with your homeserver URL
-        val host = URL("https://matrix.example.com")
-
-        // here replace with your homeserver domain
-        val domain = "matrix.example.com"
-
-        // this password will bi used for all created accounts
-        val password = "password0000"
-
-//        // create new users with password `password`
+        // create users with names like user_{0-1000}
         runBlocking {
-            processRegisterUsersAsync(host, 0..1000, password)
+            processRegisterUsersAsync(host, usersRange, password)
         }
-        // endregion4
+    }
 
+    fun publicMassRoomsTest(countOfMessages: Int = 1000) {
+        // read rooms and users range which joined to this room
+        val directRoomsData = File(Files.PUBLIC_ROOMS_AND_USER_RANGE.path).readLines().map {
+            RoomIdForUserRange(it.split(" "))
+        }
 
-//    // region public room test
-//
-//    // read room id-s from file
-//    val roomAddresses = File(Files.PUBLIC_ROOMS.path).readLines()
-//    // how mach users join and flood in room
-//    val usersPerRoom = 50
-//
-//    // just temporary variable
-//    var currentUserId = 0
-//
-//    val testData = mutableListOf<RoomIdForUserRange>()
-//
-////    create list of test data which contains RoomUserBatch objects
-//    for (i in roomAddresses) {
-//        testData.add(RoomIdForUserRange(i, currentUserId..(currentUserId + usersPerRoom)))
-//        currentUserId += usersPerRoom + 1
-//    }
-//
-//    // run it once for creating rooms
-//    runBlocking {
-//        processCreatePublicRoomsAsync(host, 0..10, "admin", "admin")
-//    }
-//
-//    // run it once when was chat created and this is join users to rooms which in
-//    runBlocking {
-//        processJoinToRoomAsync(host, testData, password)
-//    }
-//
-//    // this method creates many user connections to matrix and start to sending messages
-//    runBlocking {
-//        GlobalScope.launch {
-//            processSendMessagesAsync(host, testData, password, 1000)
-//        }.join()
-//    }
-//
-//    // endregion
+        // this method creates many user connections to matrix and start to sending messages
+        runBlocking {
+            GlobalScope.launch {
+                processSendMessagesAsync(host, directRoomsData, password, countOfMessages)
+            }.join()
+        }
+    }
 
+    fun prepareForPublicMassRoomsTest(usersPerRoom: Int, roomIdRange: IntRange, userName: String, password: String) {
+        // run it once for creating rooms
+        runBlocking {
+            processCreatePublicRoomsAsync(host, roomIdRange, userName, password)
+        }
 
-        // region direct room test
+        // read room id-s from file
+        val roomAddresses = File(Files.PUBLIC_ROOMS.path).readLines()
 
+        // just temporary variable
+        var currentUserId = 0
+
+        val testData = mutableListOf<RoomIdForUserRange>()
+
+        // create list of test data which contains RoomUserBatch objects
+        for (i in roomAddresses) {
+            testData.add(RoomIdForUserRange(i, currentUserId until currentUserId + usersPerRoom))
+            currentUserId += usersPerRoom
+        }
+
+        // run it once when was chat created and this is join users to rooms which in
+        runBlocking {
+            processJoinToRoomAsync(host, testData, password)
+        }
+    }
+
+    fun directRoomsTest(countOfMessages: Int) {
+        // read room and users id from file
+        val directRoomsData = File(Files.DIRECT_ROOMS_AND_USER_IDS.path).readLines().map {
+            RoomIdForUserRange(it.split(" "))
+        }
+
+        runBlocking {
+            processSendDirectMessagesAsync(host, directRoomsData, password, countOfMessages)
+        }
+    }
+
+    fun prepareForDirectRoomsTest(usersRange: IntRange) {
         // run it once for creating direct rooms
         runBlocking {
-            processCreateDirectRoomsAsync(host, 0..1000, password)
+            processCreateDirectRoomsAsync(host, usersRange, password)
         }
 
         // read room and users id from file
@@ -87,20 +100,21 @@ class Main {
         runBlocking {
             processInviteToDirectRoomAsync(host, domain, directRoomsData, password)
         }
-
-//        runBlocking {
-//            GlobalScope.launch {
-//                processSendDirectMessagesAsync(host, directRoomsData, password, 10)
-//            }.join()
-//        }
-
-        // endregion
-
-
     }
 
     companion object {
+        // path where current run logs will be saved
         val currentLogDirPath = "test_results/${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}/"
+
+        // here replace with your homeserver URL
+        val host = URL("https://matrix.example.com")
+
+        // here replace with your homeserver domain
+        val domain = "matrix.example.com"
+
+        // this password will bi used for all created accounts
+        val password = "password0000"
+
     }
 }
 
@@ -141,7 +155,7 @@ suspend fun processSendDirectMessagesAsync(host: URL, testData: List<RoomIdForUs
 }
 
 
-// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+// run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
 suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
@@ -149,6 +163,7 @@ suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>
                 GlobalScope.run {
                     launch {
                         joinToRoom(host, data.fromTo, password, data.roomId)
+                        savePublicRoomAndUserStartEndToFile(data.fromTo.first, data.fromTo.last, data.roomId)
                     }
                 }
             }.joinAll()
@@ -160,7 +175,7 @@ suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>
 }
 
 
-// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+// run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
 suspend fun processRegisterUsersAsync(host: URL, fromTo: IntRange, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
@@ -177,7 +192,7 @@ suspend fun processRegisterUsersAsync(host: URL, fromTo: IntRange, password: Str
 }
 
 
-// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+// run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
 suspend fun processCreatePublicRoomsAsync(host: URL, fromTo: IntRange, userName: String, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
@@ -194,7 +209,7 @@ suspend fun processCreatePublicRoomsAsync(host: URL, fromTo: IntRange, userName:
 }
 
 
-// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+// run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
 suspend fun processCreateDirectRoomsAsync(host: URL, fromTo: IntRange, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
@@ -211,7 +226,7 @@ suspend fun processCreateDirectRoomsAsync(host: URL, fromTo: IntRange, password:
 }
 
 
-// run coroutine with joinToRoom for each element of testData, then joinToRoom inside run coroutine for each user
+// run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
 suspend fun processInviteToDirectRoomAsync(host: URL, domain: String, testData: List<RoomIdForUserRange>, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
