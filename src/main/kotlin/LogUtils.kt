@@ -1,3 +1,4 @@
+import Main.Companion.currentLogDirPath
 import java.io.File
 
 /**
@@ -9,5 +10,5 @@ import java.io.File
  * @param  data  string will be added with new line on end
  */
 fun writeLog(logType: LogType, data: String) {
-    File(logType.logFileName).appendText(data + "\n")
+    File(currentLogDirPath + logType.logFileName).appendText(data + "\n")
 }
