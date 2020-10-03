@@ -11,15 +11,15 @@ import kotlin.system.measureNanoTime
 fun main() {
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users
-//    Main().registerTestUsers()
+    Tests().registerTestUsers(0..1000)
 
     // run this once to create rooms and join users to them
-//    Tests().prepareForPublicMassRoomsTest(50, 0..10, "user_0", Tests.password)
+    Tests().prepareForPublicMassRoomsTest(50, 0..10, "user_0", Tests.password)
 
-//    Tests().publicMassRoomsTest()
+    Tests().publicMassRoomsTest()
 
     // run this once to create rooms and join users to them
-//    Tests().prepareForDirectRoomsTest(0..1000)
+    Tests().prepareForDirectRoomsTest(0..1000)
 
     Tests().directRoomsTest(1000)
 }
