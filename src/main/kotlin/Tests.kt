@@ -5,10 +5,12 @@ import java.io.File
 import java.net.URL
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import kotlin.concurrent.thread
 import kotlin.system.measureNanoTime
 
-
 fun main() {
+    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, 2000.toString()) // change 2000 to your max parallel limit
+
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users
     Tests().registerTestUsers(0..1000)
@@ -16,7 +18,7 @@ fun main() {
     // run this once to create rooms and join users to them
     Tests().prepareForPublicMassRoomsTest(50, 0..10, "user_0", Tests.password)
 
-    Tests().publicMassRoomsTest()
+    Tests().publicMassRoomsTest(10000)
 
     // run this once to create rooms and join users to them
     Tests().prepareForDirectRoomsTest(0..1000)
@@ -114,7 +116,6 @@ class Tests {
 
         // this password will bi used for all created accounts
         val password = "password0000"
-
     }
 }
 
@@ -124,11 +125,11 @@ suspend fun processSendMessagesAsync(host: URL, testData: List<RoomIdForUserRang
         val time = measureNanoTime {
             testData.map { data ->
                 GlobalScope.run {
-                    launch {
+                    thread {
                         sendMessagesToPublicRooms(host, data.roomId, password, data.fromTo, countOfMessages = countOfMessages)
                     }
                 }
-            }.joinAll()
+            }.map { it.join() }
         }
         writeLog(LogType.TOTAL, "messages ${countOfMessages}: $time")
     } catch (e: MatrixClientRequestException) {

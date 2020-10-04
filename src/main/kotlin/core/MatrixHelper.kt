@@ -9,6 +9,7 @@ import matrix.room.RoomCreationOptions
 import matrix.room.RoomDirectoryVisibility
 import java.io.File
 import java.net.URL
+import kotlin.concurrent.thread
 import kotlin.system.measureNanoTime
 
 
@@ -129,18 +130,18 @@ suspend fun joinToRoom(host: URL, fromTo: IntRange, password: String, roomId: St
  * @param  message text message
  * @param  countOfMessages count messages which will be send by user
  */
-suspend fun sendMessagesToPublicRooms(
+fun sendMessagesToPublicRooms(
         host: URL,
         roomId: String,
         password: String,
         fromTo: IntRange,
         message: String = "1234567890".repeat(5),
         countOfMessages: Int = 10
-) = withContext(Dispatchers.IO) {
+) {
     try {
         (fromTo.first until fromTo.last).map { n ->
             GlobalScope.run {
-                launch {
+                thread {
                     val client = MatrixHttpClient(host).apply {
                         login(MatrixPasswordCredentials(getNUserName(n), password))
                     }
@@ -154,7 +155,9 @@ suspend fun sendMessagesToPublicRooms(
                     client.logout()
                 }
             }
-        }.joinAll()
+        }.map {
+            it.join()
+        }
 
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
