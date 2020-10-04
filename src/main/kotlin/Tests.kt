@@ -9,7 +9,10 @@ import kotlin.concurrent.thread
 import kotlin.system.measureNanoTime
 
 fun main() {
-    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, 2000.toString()) // change 2000 to your max parallel limit
+    // please read Readme
+    // this option working only on linux
+    // change 2000 to your max parallel limit
+    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, 2000.toString())
 
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users

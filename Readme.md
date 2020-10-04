@@ -9,3 +9,7 @@ Thank you [maxidorius](https://github.com/maxidorius) for [sdk](https://github.c
 Pull requests are welcome!
 
 
+#### Attention!
+
+This app working okay on `Linux`, if you want to use it on `Windows` or `MAC`, you need to replace `launch` with `thread`. 
+Soon I will add a branch using threads.
