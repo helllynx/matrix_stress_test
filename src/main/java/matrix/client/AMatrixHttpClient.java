@@ -50,6 +50,10 @@ public abstract class AMatrixHttpClient implements _MatrixClientRaw {
     protected JsonParser jsonParser = new JsonParser();
     private OkHttpClient client;
 
+    public void disconnect() throws IOException {
+        client.cache().close();
+    }
+
     public AMatrixHttpClient(String domain) {
         this(new MatrixClientContext().setDomain(domain));
     }

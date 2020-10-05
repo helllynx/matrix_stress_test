@@ -9,7 +9,6 @@ import matrix.room.RoomCreationOptions
 import matrix.room.RoomDirectoryVisibility
 import java.io.File
 import java.net.URL
-import kotlin.concurrent.thread
 import kotlin.system.measureNanoTime
 
 
@@ -38,14 +37,14 @@ fun getNRoomName(n: Int): String {
  * @param  fromTo pair of Int's which specify from and to indexes users which will be used for test in this room
  * @param  password  password from all accounts
  */
-suspend fun createPublicRoom(host: URL, fromTo: IntRange, userName: String, password: String) {
+suspend fun createPublicRoom(host: URL, fromTo: IntRange, userName: String, password: String) = withContext(Dispatchers.IO) {
     try {
         val client = MatrixHttpClient(host).apply {
             login(MatrixPasswordCredentials(userName, password))
         }
 
         (fromTo.first until fromTo.last).map { n ->
-            GlobalScope.async {
+            async {
                 val start = System.nanoTime()
                 val roomOptions = RoomCreationOptions.Builder()
                         .setName(getNRoomName(n))
@@ -56,7 +55,7 @@ suspend fun createPublicRoom(host: URL, fromTo: IntRange, userName: String, pass
                 saveRoomIdToFile(client.createRoom(roomOptions).address)
             }
         }.joinAll()
-        client.logout()
+        //client.logout()
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
     }
@@ -69,10 +68,10 @@ suspend fun createPublicRoom(host: URL, fromTo: IntRange, userName: String, pass
  * @param  fromTo pair of Int's which specify from and to indexes users which will be used for test in this room
  * @param  password  password from all accounts
  */
-suspend fun createPrivate1by1Room(host: URL, fromTo: IntRange, password: String) {
+suspend fun createPrivate1by1Room(host: URL, fromTo: IntRange, password: String) = withContext(Dispatchers.IO) {
     try {
         (fromTo.first until fromTo.last step 2).map { n ->
-            GlobalScope.async {
+            async {
                 val client = MatrixHttpClient(host).apply {
                     login(MatrixPasswordCredentials(getNUserName(n), password))
                 }
@@ -82,8 +81,8 @@ suspend fun createPrivate1by1Room(host: URL, fromTo: IntRange, password: String)
                         .setVisibility(RoomDirectoryVisibility.Private)
                         .get()
 
-                saveDirectRoomAndUsersToFile(n, n + 1, client.createRoom(roomOptions).address)
-                client.logout()
+                saveCreatedDirectRoomAndUsersToFile(n, n + 1, client.createRoom(roomOptions).address)
+                //client.logout()
             }
         }.joinAll()
     } catch (e: MatrixClientRequestException) {
@@ -99,19 +98,17 @@ suspend fun createPrivate1by1Room(host: URL, fromTo: IntRange, password: String)
  * @param  password  password from all accounts
  * @param  roomId  id of room like !KaVmYkkfnthPVfFpfi:matrix.example.com
  */
-suspend fun joinToRoom(host: URL, fromTo: IntRange, password: String, roomId: String) {
+suspend fun joinToRoom(host: URL, fromTo: IntRange, password: String, roomId: String) = withContext(Dispatchers.IO) {
     try {
-        (fromTo.first until fromTo.last).map { n ->
-            coroutineScope {
-                async {
-                    val start = System.nanoTime()
-                    val client = MatrixHttpClient(host).apply {
-                        login(MatrixPasswordCredentials(getNUserName(n), password))
-                    }
-                    client.joinRoom(roomId)
-                    writeLog(LogType.JOIN, (System.nanoTime() - start).toString())
-                    client.logout()
+        fromTo.map { n ->
+            async {
+                val start = System.nanoTime()
+                val client = MatrixHttpClient(host).apply {
+                    login(MatrixPasswordCredentials(getNUserName(n), password))
                 }
+                client.joinRoom(roomId)
+                writeLog(LogType.JOIN, (System.nanoTime() - start).toString())
+                //client.logout()
             }
         }.joinAll()
     } catch (e: MatrixClientRequestException) {
@@ -130,33 +127,29 @@ suspend fun joinToRoom(host: URL, fromTo: IntRange, password: String, roomId: St
  * @param  message text message
  * @param  countOfMessages count messages which will be send by user
  */
-fun sendMessagesToPublicRooms(
+suspend fun sendMessagesToPublicRooms(
         host: URL,
         roomId: String,
         password: String,
         fromTo: IntRange,
         message: String = "1234567890".repeat(5),
         countOfMessages: Int = 10
-) {
+) = withContext(Dispatchers.IO) {
     try {
         (fromTo.first until fromTo.last).map { n ->
-            GlobalScope.run {
-                thread {
-                    val client = MatrixHttpClient(host).apply {
-                        login(MatrixPasswordCredentials(getNUserName(n), password))
-                    }
-                    val room = client.getRoom(roomId)
-                    val time = measureNanoTime {
-                        repeat(countOfMessages) {
-                            room.sendText(message)
-                        }
-                    }
-                    writeLog(LogType.MESSAGE, time.toString())
-                    client.logout()
+            launch {
+                val client = MatrixHttpClient(host).apply {
+                    login(MatrixPasswordCredentials(getNUserName(n), password))
                 }
+                val room = client.getRoom(roomId)
+                val time = measureNanoTime {
+                    repeat(countOfMessages) {
+                        room.sendText(message)
+                    }
+                }
+                writeLog(LogType.MESSAGE, time.toString())
+                //client.logout()
             }
-        }.map {
-            it.join()
         }
 
     } catch (e: MatrixClientRequestException) {
@@ -184,8 +177,12 @@ suspend fun sendMessagesToPrivateConversation(
         countOfMessages: Int = 10
 ) = withContext(Dispatchers.IO) {
     try {
-        sendMessagesToDirectRoom(host, roomId, password, bob, message, countOfMessages)
-        sendMessagesToDirectRoom(host, roomId, password, alice, message, countOfMessages)
+        launch {
+            sendMessagesToDirectRoom(host, roomId, password, bob, message, countOfMessages)
+        }
+        launch {
+            sendMessagesToDirectRoom(host, roomId, password, alice, message, countOfMessages)
+        }
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
     }
@@ -201,21 +198,19 @@ private suspend fun sendMessagesToDirectRoom(
         countOfMessages: Int = 10
 ) = withContext(Dispatchers.IO) {
     try {
-        GlobalScope.run {
-            launch {
-                val client = MatrixHttpClient(host).apply {
-                    login(MatrixPasswordCredentials(getNUserName(user), password))
-                }
-
-                val room = client.getRoom(roomId)
-                val time = measureNanoTime {
-                    repeat(countOfMessages) {
-                        room.sendText(message)
-                    }
-                }
-                writeLog(LogType.MESSAGE, time.toString())
-                client.logout()
+        launch {
+            val client = MatrixHttpClient(host).apply {
+                login(MatrixPasswordCredentials(getNUserName(user), password))
             }
+
+            val room = client.getRoom(roomId)
+            val time = measureNanoTime {
+                repeat(countOfMessages) {
+                    room.sendText(message)
+                }
+            }
+            writeLog(LogType.MESSAGE, time.toString())
+            //client.logout()
         }
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
@@ -240,12 +235,12 @@ suspend fun registerUsers(
 ) = withContext(Dispatchers.IO) {
     try {
         (fromTo.first until fromTo.last).map { n ->
-            GlobalScope.async {
+            async {
                 MatrixHttpClient(host).apply {
                     val start = System.nanoTime()
                     register(MatrixPasswordCredentials(getNUserName(n), password), false)
                     writeLog(LogType.REGISTER, (System.nanoTime() - start).toString())
-                    logout()
+//                    logout()
                 }
             }
         }.joinAll()
@@ -274,13 +269,13 @@ suspend fun inviteUserToDirectRoom(
         roomId: String
 ) = withContext(Dispatchers.IO) {
     try {
-        GlobalScope.async {
+        async {
             val client = MatrixHttpClient(host).apply {
                 login(MatrixPasswordCredentials(getNUserName(bob), password))
             }
             val room = client.getRoom(roomId)
             room.invite(MatrixID.Builder("@${getNUserName(alice)}:$domain").valid())
-            client.logout()
+            //client.logout()
         }.join()
     } catch (e: MatrixClientRequestException) {
         e.printStackTrace()
@@ -322,6 +317,10 @@ fun savePublicRoomAndUserStartEndToFile(start: Int, end: Int, roomId: String) {
  * @param  alice  alice user id
  * @param  roomId  room id like !KaVmYkkfnthPVfFpfi:matrix.example.com
  */
-fun saveDirectRoomAndUsersToFile(bob: Int, alice: Int, roomId: String) {
-    File(Files.DIRECT_ROOMS_AND_USER_IDS.path).appendText("$bob $alice $roomId\n")
+fun saveCreatedDirectRoomAndUsersToFile(bob: Int, alice: Int, roomId: String) {
+    File(Files.DIRECT_CREATED_ROOMS_AND_USER_IDS.path).appendText("$bob $alice $roomId\n")
+}
+
+fun saveJoinedDirectRoomAndUsersToFile(bob: Int, alice: Int, roomId: String) {
+    File(Files.DIRECT_JOINED_ROOMS_AND_USER_IDS.path).appendText("$bob $alice $roomId\n")
 }

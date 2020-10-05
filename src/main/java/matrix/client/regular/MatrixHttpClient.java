@@ -44,6 +44,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
@@ -300,4 +301,8 @@ public class MatrixHttpClient extends AMatrixHttpClient implements _MatrixClient
         return new MatrixHttpPushRule(context, scope, kind, id);
     }
 
+    @Override
+    public void disconnect() throws IOException {
+        super.disconnect();
+    }
 }

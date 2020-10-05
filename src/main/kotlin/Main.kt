@@ -5,28 +5,26 @@ import java.io.File
 import java.net.URL
 import java.time.Instant
 import java.time.format.DateTimeFormatter
-import kotlin.concurrent.thread
 import kotlin.system.measureNanoTime
 
 fun main() {
-    // please read Readme
     // this option working only on linux
-    // change 2000 to your max parallel limit
-    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, 2000.toString())
+    // change 2000 to your max parallel limit, but be careful, too big values can hang your pc
+    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, Tests.maxTreadsCount.toString())
 
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users
-    Tests().registerTestUsers(0..1000)
+    Tests().registerTestUsers(1000..1010)
 
     // run this once to create rooms and join users to them
-    Tests().prepareForPublicMassRoomsTest(50, 0..10, "user_0", Tests.password)
+    Tests().prepareForPublicMassRoomsTest(100, 0..10, "user_0", Tests.password)
 
     Tests().publicMassRoomsTest(10000)
 
     // run this once to create rooms and join users to them
     Tests().prepareForDirectRoomsTest(0..1000)
 
-    Tests().directRoomsTest(1000)
+    Tests().directRoomsTest(10)
 }
 
 class Tests {
@@ -47,9 +45,7 @@ class Tests {
 
         // this method creates many user connections to matrix and start to sending messages
         runBlocking {
-            GlobalScope.launch {
-                processSendMessagesAsync(host, directRoomsData, password, countOfMessages)
-            }.join()
+            processSendMessagesAsync(host, directRoomsData, password, countOfMessages)
         }
     }
 
@@ -75,13 +71,13 @@ class Tests {
 
         // run it once when was chat created and this is join users to rooms which in
         runBlocking {
-            processJoinToRoomAsync(host, testData, password)
+            processJoinToRoomAsync(host, testData, password, true)
         }
     }
 
     fun directRoomsTest(countOfMessages: Int) {
         // read room and users id from file
-        val directRoomsData = File(Files.DIRECT_ROOMS_AND_USER_IDS.path).readLines().map {
+        val directRoomsData = File(Files.DIRECT_JOINED_ROOMS_AND_USER_IDS.path).readLines().map {
             RoomIdForUserRange(it.split(" "))
         }
 
@@ -97,7 +93,7 @@ class Tests {
         }
 
         // read room and users id from file
-        val directRoomsData = File(Files.DIRECT_ROOMS_AND_USER_IDS.path).readLines().map {
+        val directRoomsData = File(Files.DIRECT_CREATED_ROOMS_AND_USER_IDS.path).readLines().map {
             RoomIdForUserRange(it.split(" "))
         }
 
@@ -105,17 +101,23 @@ class Tests {
         runBlocking {
             processInviteToDirectRoomAsync(host, domain, directRoomsData, password)
         }
+
+        runBlocking {
+            processJoinToRoomAsync(host, directRoomsData, password, false)
+        }
     }
 
     companion object {
+        val maxTreadsCount = 500
+
         // path where current run logs will be saved
-        val currentLogDirPath = "test_results/${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}/"
+        val currentLogDirPath = "test_results/${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}_$maxTreadsCount/"
 
         // here replace with your homeserver URL
-        val host = URL("https://matrix.example.com")
+        val host = URL("https://matrix.aura-ms.com")
 
         // here replace with your homeserver domain
-        val domain = "matrix.example.com"
+        val domain = "matrix.aura-ms.com"
 
         // this password will bi used for all created accounts
         val password = "password0000"
@@ -127,12 +129,10 @@ suspend fun processSendMessagesAsync(host: URL, testData: List<RoomIdForUserRang
     try {
         val time = measureNanoTime {
             testData.map { data ->
-                GlobalScope.run {
-                    thread {
-                        sendMessagesToPublicRooms(host, data.roomId, password, data.fromTo, countOfMessages = countOfMessages)
-                    }
+                launch {
+                    sendMessagesToPublicRooms(host, data.roomId, password, data.fromTo, countOfMessages = countOfMessages)
                 }
-            }.map { it.join() }
+            }.joinAll()
         }
         writeLog(LogType.TOTAL, "messages ${countOfMessages}: $time")
     } catch (e: MatrixClientRequestException) {
@@ -145,10 +145,8 @@ suspend fun processSendDirectMessagesAsync(host: URL, testData: List<RoomIdForUs
     try {
         val time = measureNanoTime {
             testData.map { data ->
-                GlobalScope.run {
-                    launch {
-                        sendMessagesToPrivateConversation(host, data.roomId, password, data.fromTo.first, data.fromTo.last, countOfMessages = countOfMessages)
-                    }
+                launch {
+                    sendMessagesToPrivateConversation(host, data.roomId, password, data.fromTo.first, data.fromTo.last, countOfMessages = countOfMessages)
                 }
             }.joinAll()
         }
@@ -160,15 +158,16 @@ suspend fun processSendDirectMessagesAsync(host: URL, testData: List<RoomIdForUs
 
 
 // run coroutine with core.joinToRoom for each element of testData, then core.joinToRoom inside run coroutine for each user
-suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>, password: String) = withContext(Dispatchers.IO) {
+suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>, password: String, publicRoom: Boolean) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
             testData.map { data ->
-                GlobalScope.run {
-                    launch {
-                        joinToRoom(host, data.fromTo, password, data.roomId)
+                launch {
+                    joinToRoom(host, data.fromTo, password, data.roomId)
+                    if (publicRoom)
                         savePublicRoomAndUserStartEndToFile(data.fromTo.first, data.fromTo.last, data.roomId)
-                    }
+                    else
+                        saveJoinedDirectRoomAndUsersToFile(data.fromTo.first, data.fromTo.last, data.roomId)
                 }
             }.joinAll()
         }
@@ -183,10 +182,8 @@ suspend fun processJoinToRoomAsync(host: URL, testData: List<RoomIdForUserRange>
 suspend fun processRegisterUsersAsync(host: URL, fromTo: IntRange, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
-            GlobalScope.run {
-                launch {
-                    registerUsers(host, fromTo, password)
-                }
+            launch {
+                registerUsers(host, fromTo, password)
             }.join()
         }
         writeLog(LogType.TOTAL, "register ${fromTo.first} - ${fromTo.last}: $time")
@@ -200,10 +197,8 @@ suspend fun processRegisterUsersAsync(host: URL, fromTo: IntRange, password: Str
 suspend fun processCreatePublicRoomsAsync(host: URL, fromTo: IntRange, userName: String, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
-            GlobalScope.run {
-                launch {
-                    createPublicRoom(host, fromTo, userName, password)
-                }
+            launch {
+                createPublicRoom(host, fromTo, userName, password)
             }.join()
         }
         writeLog(LogType.TOTAL, "create room ${fromTo.first} - ${fromTo.last}: $time")
@@ -217,10 +212,8 @@ suspend fun processCreatePublicRoomsAsync(host: URL, fromTo: IntRange, userName:
 suspend fun processCreateDirectRoomsAsync(host: URL, fromTo: IntRange, password: String) = withContext(Dispatchers.IO) {
     try {
         val time = measureNanoTime {
-            GlobalScope.run {
-                launch {
-                    createPrivate1by1Room(host, fromTo, password)
-                }
+            launch {
+                createPrivate1by1Room(host, fromTo, password)
             }.join()
         }
         writeLog(LogType.TOTAL, "create private rooms ${fromTo.first} - ${fromTo.last}: $time")
@@ -235,10 +228,8 @@ suspend fun processInviteToDirectRoomAsync(host: URL, domain: String, testData: 
     try {
         val time = measureNanoTime {
             testData.map { data ->
-                GlobalScope.run {
-                    launch {
-                        inviteUserToDirectRoom(host, domain, data.fromTo.first, data.fromTo.last, password, data.roomId)
-                    }
+                launch {
+                    inviteUserToDirectRoom(host, domain, data.fromTo.first, data.fromTo.last, password, data.roomId)
                 }
             }.joinAll()
         }
