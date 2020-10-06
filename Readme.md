@@ -4,7 +4,7 @@ This app is another try to make loading\stress tests for Matrix Home Server.
 
 **PLEASE DON'T USE IT ON PRODUCTION SERVER!!!**
 
-For examples please check `src/main/kotlin/Tests.kt`
+For examples please check `src/main/kotlin/Main.kt`
 
 Don't forget to change limitations in config like below:
 
@@ -44,7 +44,7 @@ rc_joins:
 
 ### Attention!
 
-This app working okay on `Linux`, if you want to use it on `Windows` or `MAC`, you need to replace `launch` with `thread`. 
+This app working properly on `Linux`, if you want to use it on `Windows` or `MAC` please replace `launch` with `thread`. 
 Soon I will add a branch using threads.
 
 
