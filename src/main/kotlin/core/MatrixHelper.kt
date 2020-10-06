@@ -137,7 +137,6 @@ suspend fun sendMessagesToPublicRooms(
         countOfMessages: Int = 10
 ) = withContext(Dispatchers.IO) {
     try {
-        val counter = counterActor()
         (fromTo.first until fromTo.last).map { n ->
             launch {
                 val client = MatrixHttpClient(host).apply {
@@ -146,7 +145,7 @@ suspend fun sendMessagesToPublicRooms(
                 val room = client.getRoom(roomId)
                 val time = measureNanoTime {
                     repeat(countOfMessages) {
-                        counter.send(IncCounter)
+                        counter.incrementAndGet()
                         room.sendText(message)
                     }
                 }

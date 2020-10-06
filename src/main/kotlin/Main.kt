@@ -1,4 +1,3 @@
-import Tests.Companion.timer
 import core.*
 import kotlinx.coroutines.*
 import matrix.client.MatrixClientRequestException
@@ -8,7 +7,6 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.fixedRateTimer
-import kotlin.math.log
 import kotlin.system.measureNanoTime
 
 fun main() {
@@ -18,15 +16,15 @@ fun main() {
 
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users
-//    Tests().registerTestUsers(1000..1010)
+    Tests().registerTestUsers(1000..1010)
 
     // run this once to create rooms and join users to them
-//    Tests().prepareForPublicMassRoomsTest(100, 0..10, "user_0", Tests.password)
+    Tests().prepareForPublicMassRoomsTest(100, 0..10, "user_0", Tests.password)
 
-//    Tests().publicMassRoomsTest(10000)
+    Tests().publicMassRoomsTest(10)
 
     // run this once to create rooms and join users to them
-//    Tests().prepareForDirectRoomsTest(0..1000)
+    Tests().prepareForDirectRoomsTest(0..1000)
 
     Tests().directRoomsTest(10)
 }
@@ -41,7 +39,7 @@ class Tests {
         }
     }
 
-    fun publicMassRoomsTest(countOfMessages: Int = 1000) {
+    fun publicMassRoomsTest(countOfMessages: Int) {
         // read rooms and users range which joined to this room
         val directRoomsData = File(Files.PUBLIC_ROOMS_AND_USER_RANGE.path).readLines().map {
             RoomIdForUserRange(it.split(" "))
@@ -49,10 +47,10 @@ class Tests {
 
         // this method creates many user connections to matrix and start to sending messages
         runBlocking {
-            processSendMessagesAsync(host, directRoomsData.slice(0..5), password, countOfMessages)
+            processSendMessagesAsync(host, directRoomsData, password, countOfMessages)
         }
 
-        writeLog(LogType.MESSAGE_PER_SEC, messagesPerSecList.joinToString("\n"))
+        writeLog(LogType.MESSAGE_PER_SEC_PUBLIC_ROOM, messagesPerSecList.joinToString("\n"))
     }
 
     fun prepareForPublicMassRoomsTest(usersPerRoom: Int, roomIdRange: IntRange, userName: String, password: String) {
@@ -91,7 +89,7 @@ class Tests {
             processSendDirectMessagesAsync(host, directRoomsData, password, countOfMessages)
         }
 
-        writeLog(LogType.MESSAGE_PER_SEC, messagesPerSecList.joinToString("\n"))
+        writeLog(LogType.MESSAGE_PER_SEC_DIRECT, messagesPerSecList.joinToString("\n"))
     }
 
     fun prepareForDirectRoomsTest(usersRange: IntRange) {
