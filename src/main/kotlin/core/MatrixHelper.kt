@@ -1,5 +1,6 @@
 package core
 
+import Tests.Companion.counter
 import kotlinx.coroutines.*
 import matrix.MatrixID
 import matrix.client.MatrixClientRequestException
@@ -136,6 +137,7 @@ suspend fun sendMessagesToPublicRooms(
         countOfMessages: Int = 10
 ) = withContext(Dispatchers.IO) {
     try {
+        val counter = counterActor()
         (fromTo.first until fromTo.last).map { n ->
             launch {
                 val client = MatrixHttpClient(host).apply {
@@ -144,6 +146,7 @@ suspend fun sendMessagesToPublicRooms(
                 val room = client.getRoom(roomId)
                 val time = measureNanoTime {
                     repeat(countOfMessages) {
+                        counter.send(IncCounter)
                         room.sendText(message)
                     }
                 }
@@ -206,6 +209,7 @@ private suspend fun sendMessagesToDirectRoom(
             val room = client.getRoom(roomId)
             val time = measureNanoTime {
                 repeat(countOfMessages) {
+                    counter.incrementAndGet()
                     room.sendText(message)
                 }
             }

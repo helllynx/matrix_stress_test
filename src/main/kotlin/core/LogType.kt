@@ -8,6 +8,7 @@ package core
  */
 enum class LogType(val logFileName: String) {
     MESSAGE("message.log"),
+    MESSAGE_PER_SEC("message_per_sec.log"),
     REGISTER("register.log"),
     LOGIN("login.log"),
     JOIN("join.log"),

@@ -1,3 +1,4 @@
+import Tests.Companion.timer
 import core.*
 import kotlinx.coroutines.*
 import matrix.client.MatrixClientRequestException
@@ -5,24 +6,27 @@ import java.io.File
 import java.net.URL
 import java.time.Instant
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.concurrent.fixedRateTimer
+import kotlin.math.log
 import kotlin.system.measureNanoTime
 
 fun main() {
     // this option working only on linux
     // change 2000 to your max parallel limit, but be careful, too big values can hang your pc
-    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, Tests.maxTreadsCount.toString())
+    System.setProperty(IO_PARALLELISM_PROPERTY_NAME, Tests.maxParallelIOCount.toString())
 
     File(Tests.currentLogDirPath).mkdirs()
     // run this once for creating users
-    Tests().registerTestUsers(1000..1010)
+//    Tests().registerTestUsers(1000..1010)
 
     // run this once to create rooms and join users to them
-    Tests().prepareForPublicMassRoomsTest(100, 0..10, "user_0", Tests.password)
+//    Tests().prepareForPublicMassRoomsTest(100, 0..10, "user_0", Tests.password)
 
-    Tests().publicMassRoomsTest(10000)
+//    Tests().publicMassRoomsTest(10000)
 
     // run this once to create rooms and join users to them
-    Tests().prepareForDirectRoomsTest(0..1000)
+//    Tests().prepareForDirectRoomsTest(0..1000)
 
     Tests().directRoomsTest(10)
 }
@@ -45,8 +49,10 @@ class Tests {
 
         // this method creates many user connections to matrix and start to sending messages
         runBlocking {
-            processSendMessagesAsync(host, directRoomsData, password, countOfMessages)
+            processSendMessagesAsync(host, directRoomsData.slice(0..5), password, countOfMessages)
         }
+
+        writeLog(LogType.MESSAGE_PER_SEC, messagesPerSecList.joinToString("\n"))
     }
 
     fun prepareForPublicMassRoomsTest(usersPerRoom: Int, roomIdRange: IntRange, userName: String, password: String) {
@@ -84,6 +90,8 @@ class Tests {
         runBlocking {
             processSendDirectMessagesAsync(host, directRoomsData, password, countOfMessages)
         }
+
+        writeLog(LogType.MESSAGE_PER_SEC, messagesPerSecList.joinToString("\n"))
     }
 
     fun prepareForDirectRoomsTest(usersRange: IntRange) {
@@ -108,10 +116,11 @@ class Tests {
     }
 
     companion object {
-        val maxTreadsCount = 500
+        // maximum count if parallel IO coroutines
+        const val maxParallelIOCount = 400
 
         // path where current run logs will be saved
-        val currentLogDirPath = "test_results/${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}_$maxTreadsCount/"
+        val currentLogDirPath = "test_results/${DateTimeFormatter.ISO_INSTANT.format(Instant.now())}_$maxParallelIOCount/"
 
         // here replace with your homeserver URL
         val host = URL("https://matrix.aura-ms.com")
@@ -121,6 +130,15 @@ class Tests {
 
         // this password will bi used for all created accounts
         val password = "password0000"
+
+        val counter = AtomicInteger()
+
+        val messagesPerSecList = mutableListOf<Int>()
+
+        val timer = fixedRateTimer("messagesCountTimer", false, 0L, 1000) {
+            messagesPerSecList.add(counter.get())
+            counter.set(0)
+        }
     }
 }
 
